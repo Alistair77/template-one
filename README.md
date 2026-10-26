@@ -24,6 +24,7 @@ The page is plain HTML, CSS, and JavaScript; it has no build step or server depe
 
 - Update the event date and location in `index.html`.
 - Update the `data-target` date on `.hero-countdown` in `index.html` using an ISO timestamp with the correct timezone.
+- Bump the `?v=` date on the `styles.css` and `app.js` links in `index.html` whenever you publish changes, so browsers fetch the new files instead of cached copies.
 - Replace the registration `mailto:` link with the event's real registration URL or form.
 - Replace the photos in `assets/images/` and keep their filenames or update the references in `index.html`.
 
