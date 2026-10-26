@@ -4,11 +4,8 @@
   const motionOff = window.matchMedia('(prefers-reduced-motion: reduce)');
   document.documentElement.classList.add('motion-ready');
 
-  // Inertial smooth scrolling. Wheel events another handler already consumed (the question
-  // stepper) are left alone; touch keeps native scrolling. Falls back to native if Lenis is missing.
-  const lenis = window.Lenis && !motionOff.matches
-    ? new window.Lenis({ lerp: .085, virtualScroll: ({ event }) => !event.defaultPrevented })
-    : null;
+  // Inertial smooth scrolling; touch keeps native scrolling. Falls back to native if Lenis is missing.
+  const lenis = window.Lenis && !motionOff.matches ? new window.Lenis({ lerp: .085 }) : null;
   if (lenis) {
     const tick = (time) => { lenis.raf(time); requestAnimationFrame(tick); };
     requestAnimationFrame(tick);
@@ -210,7 +207,8 @@
     else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
   });
 
-  // Four ordered manufacturing questions advance with wheel, keyboard, or touch.
+  // The questions chapter pins to the viewport while the page scrolls through it; the scroll position
+  // picks the question, so the view is always aligned and touch, keyboard and wheel all behave the same.
   const topicCopy = [
     { title: 'Engineer better<br />products, faster.', text: 'Reduce design and engineering cycle time, increase reuse and automation, and improve product quality through earlier validation.' },
     { title: 'Accelerate design<br />to manufacturing.', text: 'Reduce manual handoffs and production rework. Improve manufacturability, automate manufacturing preparation and shorten the path to production.' },
@@ -226,129 +224,73 @@
   const topicCore = $('.topic-core');
   const topicProgress = $$('.topic-progress span');
   const liveRegion = $('.topics-live');
-  let activeTopic = 0;
-  let maxVisited = 0;
-  let topicAnimating = false;
-  let wheelGestureLocked = false;
-  let wheelIdleTimer = 0;
-  const setTopic = (index, focus = false) => {
-    if (index < 0 || index >= topicCopy.length || index > maxVisited + 1) return;
-    if (topicAnimating && index !== activeTopic) return;
-    const changed = index !== activeTopic;
-    activeTopic = index;
-    maxVisited = Math.max(maxVisited, index);
-    const current = topicCopy[index];
-    topicHeading.innerHTML = current.title;
-    topicDescription.textContent = current.text;
+  let activeTopic = -1;
+  let topicSwapTimer = 0;
+  const renderTopic = (index) => {
+    topicHeading.innerHTML = topicCopy[index].title;
+    topicDescription.textContent = topicCopy[index].text;
     topicLabel.textContent = `THE FORUM / THEME 0${index + 1}`;
     topicCore.textContent = `0${index + 1}`;
-    topicPanel.setAttribute('aria-labelledby', topicTabs[index].id);
-    if (changed) {
-      topicAnimating = true;
-      topicPanel.classList.remove('is-changing');
-      void topicPanel.offsetWidth;
+  };
+  const setTopic = (index, finished = false) => {
+    topicTabs.forEach((tab, tabIndex) => {
+      const cleared = tabIndex < index || (finished && tabIndex === index);
+      tab.classList.toggle('is-cleared', cleared);
+      $('i', tab).textContent = cleared ? '✓' : '↗';
+    });
+    if (index === activeTopic) return;
+    const first = activeTopic < 0;
+    activeTopic = index;
+    // Fade the old copy out, swap it while hidden, then fade the new copy in.
+    window.clearTimeout(topicSwapTimer);
+    if (first || motionOff.matches) renderTopic(index);
+    else {
       topicPanel.classList.add('is-changing');
-      window.setTimeout(() => {
-        topicPanel.classList.remove('is-changing');
-        topicAnimating = false;
-      }, 540);
+      topicSwapTimer = window.setTimeout(() => { renderTopic(index); topicPanel.classList.remove('is-changing'); }, 280);
     }
+    topicPanel.setAttribute('aria-labelledby', topicTabs[index].id);
     topicTabs.forEach((tab, tabIndex) => {
       const selected = tabIndex === index;
       tab.classList.toggle('is-active', selected);
       tab.setAttribute('aria-selected', String(selected));
       tab.tabIndex = selected ? 0 : -1;
-      tab.disabled = tabIndex > activeTopic;
-      tab.classList.toggle('is-cleared', tabIndex < activeTopic);
-      $('i', tab).textContent = tabIndex < activeTopic ? '✓' : '↗';
-      tab.setAttribute('aria-label', `${String(tabIndex + 1).padStart(2, '0')} ${tab.querySelector('b').textContent}${tabIndex < activeTopic ? ', completed' : selected ? ', current question' : ', upcoming question'}`);
     });
     topicProgress.forEach((bar, barIndex) => {
       bar.classList.toggle('is-current', barIndex === index);
-      bar.classList.toggle('is-visited', barIndex <= maxVisited);
+      bar.classList.toggle('is-visited', barIndex <= index);
     });
-    liveRegion.textContent = `Question ${index + 1} of 4. ${current.title.replace('<br />', ' ')}`;
-    if (focus) topicTabs[index].focus();
+    if (!first) liveRegion.textContent = `Question ${index + 1} of 4. ${topicCopy[index].title.replace('<br />', ' ')}`;
   };
-  const canStep = (direction) => direction < 0 ? activeTopic > 0 : activeTopic < topicCopy.length - 1;
-  const advance = (direction) => setTopic(activeTopic + direction);
-  const scrollStep = (direction) => {
-    if (topicAnimating) return true;
-    if (!canStep(direction)) {
-      if (direction > 0 && activeTopic === topicCopy.length - 1 && maxVisited === topicCopy.length - 1) {
-        topicTabs[activeTopic].classList.add('is-cleared');
-        $('i', topicTabs[activeTopic]).textContent = '✓';
-        topicProgress[activeTopic].classList.add('is-visited');
-      }
-      return false;
-    }
-    advance(direction);
-    return true;
+  const topicsRange = () => Math.max(1, topicsSection.offsetHeight - window.innerHeight);
+  const topicsProgress = () => Math.max(0, Math.min(1, -topicsSection.getBoundingClientRect().top / topicsRange()));
+  const scrollToTopic = (index) => {
+    const top = topicsSection.getBoundingClientRect().top + window.scrollY + (index / topicCopy.length) * topicsRange() + 2;
+    if (lenis) lenis.scrollTo(top, { duration: 1.1 });
+    else window.scrollTo({ top, behavior: motionOff.matches ? 'auto' : 'smooth' });
+  };
+  let topicsFrame = 0;
+  const updateTopics = () => {
+    if (topicsFrame) return;
+    topicsFrame = requestAnimationFrame(() => {
+      topicsFrame = 0;
+      const progress = topicsProgress();
+      setTopic(Math.min(topicCopy.length - 1, Math.floor(progress * topicCopy.length)), progress >= 1);
+    });
   };
   topicTabs.forEach((tab, index) => {
-    tab.tabIndex = index === 0 ? 0 : -1;
-    tab.disabled = index > 0;
-    tab.addEventListener('click', () => { if (!tab.disabled) setTopic(index); });
+    tab.addEventListener('click', () => scrollToTopic(index));
     tab.addEventListener('keydown', (event) => {
-      if ((event.key === 'ArrowDown' || event.key === 'ArrowRight') && index === activeTopic && activeTopic === topicCopy.length - 1) {
-        const handled = scrollStep(1);
-        if (handled) event.preventDefault();
-        return;
-      }
-      if ((event.key === 'ArrowDown' || event.key === 'ArrowRight') && index === activeTopic && activeTopic < topicCopy.length - 1) { event.preventDefault(); scrollStep(1); topicTabs[activeTopic].focus(); return; }
-      if ((event.key === 'ArrowUp' || event.key === 'ArrowLeft') && index === activeTopic && activeTopic > 0) { event.preventDefault(); scrollStep(-1); topicTabs[activeTopic].focus(); return; }
-      if (event.key === 'PageDown' && scrollStep(1)) { event.preventDefault(); return; }
-      if (event.key === 'PageUp' && scrollStep(-1)) { event.preventDefault(); return; }
-      let next = null;
-      if (event.key === 'ArrowDown' || event.key === 'ArrowRight') next = topicTabs[Math.min(index + 1, topicTabs.length - 1)];
-      if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') next = topicTabs[Math.max(index - 1, 0)];
-      if (event.key === 'Home') next = topicTabs[0];
-      if (event.key === 'End') next = topicTabs[topicTabs.length - 1];
-      if (!next || next.disabled) return;
+      const last = topicTabs.length - 1;
+      const next = { ArrowDown: index + 1, ArrowRight: index + 1, ArrowUp: index - 1, ArrowLeft: index - 1, Home: 0, End: last }[event.key];
+      if (next === undefined || next < 0 || next > last) return;
       event.preventDefault();
-      setTopic(topicTabs.indexOf(next), true);
+      topicTabs[next].focus();
+      scrollToTopic(next);
     });
   });
-  topicsSection.addEventListener('wheel', (event) => {
-    if (event.ctrlKey) return;
-    const direction = Math.sign(event.deltaY);
-    if (!direction) return;
-    if (wheelGestureLocked) {
-      event.preventDefault();
-      window.clearTimeout(wheelIdleTimer);
-      wheelIdleTimer = window.setTimeout(() => { wheelGestureLocked = false; }, 240);
-      return;
-    }
-    if (scrollStep(direction)) {
-      event.preventDefault();
-      wheelGestureLocked = true;
-      window.clearTimeout(wheelIdleTimer);
-      wheelIdleTimer = window.setTimeout(() => { wheelGestureLocked = false; }, 240);
-    }
-  }, { passive: false });
-  let touchStartY = null;
-  topicsSection.addEventListener('touchstart', (event) => { touchStartY = event.touches[0].clientY; }, { passive: true });
-  topicsSection.addEventListener('touchmove', (event) => {
-    if (touchStartY === null) return;
-    const delta = event.touches[0].clientY - touchStartY;
-    if (Math.abs(delta) > 12 && (topicAnimating || canStep(delta < 0 ? 1 : -1))) event.preventDefault();
-  }, { passive: false });
-  topicsSection.addEventListener('touchend', (event) => {
-    if (touchStartY === null) return;
-    const delta = event.changedTouches[0].clientY - touchStartY;
-    touchStartY = null;
-    if (Math.abs(delta) > 36) scrollStep(delta < 0 ? 1 : -1);
-  }, { passive: true });
-  topicsSection.addEventListener('keydown', (event) => {
-    if (event.target.closest('a,button')) return;
-    if (event.repeat) { event.preventDefault(); return; }
-    let direction = 0;
-    if (['ArrowDown', 'PageDown', ' '].includes(event.key)) direction = 1;
-    if (['ArrowUp', 'PageUp'].includes(event.key)) direction = -1;
-    if (!direction || !scrollStep(direction)) return;
-    event.preventDefault();
-  });
-  setTopic(0);
+  window.addEventListener('scroll', updateTopics, { passive: true });
+  window.addEventListener('resize', updateTopics);
+  updateTopics();
 
   // Section 05 expands its manufacturing image in direct response to the scroll position.
   const zoomSection = $('.register-zoom');
