@@ -4,6 +4,24 @@
   const motionOff = window.matchMedia('(prefers-reduced-motion: reduce)');
   document.documentElement.classList.add('motion-ready');
 
+  // Inertial smooth scrolling. Wheel events another handler already consumed (the question
+  // stepper) are left alone; touch keeps native scrolling. Falls back to native if Lenis is missing.
+  const lenis = window.Lenis && !motionOff.matches
+    ? new window.Lenis({ lerp: .085, virtualScroll: ({ event }) => !event.defaultPrevented })
+    : null;
+  if (lenis) {
+    const tick = (time) => { lenis.raf(time); requestAnimationFrame(tick); };
+    requestAnimationFrame(tick);
+    document.addEventListener('click', (event) => {
+      const link = event.target.closest('a[href^="#"]:not(.skip-link)');
+      const target = link && link.hash.length > 1 && $(link.hash);
+      if (!target) return;
+      event.preventDefault();
+      lenis.scrollTo(target, { duration: 1.4 });
+      history.pushState(null, '', link.hash);
+    });
+  }
+
   // Reveal elements as they enter the reading flow; reduced-motion users see content immediately.
   const reveals = $$('.reveal');
   if ('IntersectionObserver' in window && !motionOff.matches) {
@@ -117,8 +135,8 @@
     if ('ResizeObserver' in window) new ResizeObserver(measureGallery).observe(galleryTrack);
   }
 
-  // The hero's layered ribbons respond softly to the pointer, without changing the layout.
-  const hero = $('.hero');
+  // The shared atmosphere's ribbons respond softly to the pointer, without changing the layout.
+  const hero = $('.hero-story');
   if (hero && !motionOff.matches && matchMedia('(pointer:fine)').matches) {
     const ribbons = $$('.ribbon', hero);
     let pointerFrame = 0;
@@ -126,11 +144,11 @@
       if (pointerFrame) return;
       pointerFrame = requestAnimationFrame(() => {
         pointerFrame = 0;
-        const bounds = hero.getBoundingClientRect();
-        const x = (event.clientX - bounds.left) / bounds.width - .5;
-        const y = (event.clientY - bounds.top) / bounds.height - .5;
+        // The art is sticky to the viewport, so measure against the viewport.
+        const x = event.clientX / window.innerWidth - .5;
+        const y = event.clientY / window.innerHeight - .5;
         ribbons.forEach((ribbon, index) => {
-          const weight = (index + 1) * 4;
+          const weight = (index + 1) * 7;
           ribbon.style.setProperty('--move-x', `${(-x * weight).toFixed(1)}px`);
           ribbon.style.setProperty('--move-y', `${(-y * weight).toFixed(1)}px`);
         });
@@ -166,6 +184,7 @@
     menuToggle.setAttribute('aria-expanded', 'true');
     menuToggle.setAttribute('aria-label', 'Close navigation');
     document.body.classList.add('menu-open');
+    lenis?.stop();
     menuLinks[0]?.focus();
   };
   const closeMenu = (restore = true) => {
@@ -174,6 +193,7 @@
     menuToggle.setAttribute('aria-expanded', 'false');
     menuToggle.setAttribute('aria-label', 'Open navigation');
     document.body.classList.remove('menu-open');
+    lenis?.start();
     if (restore) menuToggle.focus();
   };
   menuToggle.addEventListener('click', () => menu.classList.contains('is-open') ? closeMenu() : openMenu());
