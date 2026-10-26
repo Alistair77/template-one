@@ -18,7 +18,7 @@ Then open <http://localhost:8000>.
 2. In the repository, open **Settings → Pages**.
 3. Set the source to **Deploy from a branch**, choose `main` and `/ (root)`, then save.
 
-The page is plain HTML, CSS, and JavaScript; it has no build step or server dependency. Manrope and DM Mono load from Google Fonts when a network connection is available, with local system fallbacks otherwise.
+The page is plain HTML, CSS, and JavaScript; it has no build step or server dependency. Smooth scrolling uses Lenis (MIT), vendored at `assets/vendor/lenis.min.js`; without it the page falls back to native scrolling. Manrope and DM Mono load from Google Fonts when a network connection is available, with local system fallbacks otherwise.
 
 ## Before publishing a new event edition
 
