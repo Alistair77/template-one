@@ -296,14 +296,20 @@
           const diagonal = Math.max(-1, Math.min(1, (center - viewportCenter) / (viewportBounds.width / 2 + bounds.width / 2)));
           const visibility = Math.max(0, Math.min(1, (1.15 - Math.abs(diagonal)) / .45));
           const stagger = [0, 8, -7, 6][index % 4];
-          const diagonalTravel = Math.min(125, window.innerHeight * .13);
-          card.style.setProperty('--gallery-y', `${(diagonal * diagonalTravel + stagger).toFixed(1)}px`);
+          const diagonalTravel = Math.min(92, window.innerHeight * .1);
+          // Over the final stretch of the scrub the row settles level, so the last
+          // panel's name always lands fully inside the viewport.
+          const settle = Math.max(0, Math.min(1, (scrub - .8) / .2));
+          let dy = 0;
+          const bottomShortfall = (viewportBounds.bottom - 12) - bounds.bottom;
+          if (bottomShortfall < 0) dy += bottomShortfall * settle;
+          card.style.setProperty('--gallery-y', `${(diagonal * diagonalTravel + stagger + dy).toFixed(1)}px`);
           card.style.setProperty('--gallery-scale', (0.91 + visibility * .09).toFixed(3));
           card.style.setProperty('--gallery-opacity', (0.3 + visibility * .7).toFixed(3));
         });
         if (galleryProgress) galleryProgress.style.transform = `scaleX(${scrub.toFixed(3)})`;
         if (galleryCount) {
-          const active = Math.min(galleryCards.length, Math.floor(scrub * Math.max(1, galleryCards.length - 1)) + 1);
+          const active = Math.min(galleryCards.length, Math.floor(scrub * (galleryCards.length - 1) + .999) + 1);
           galleryCount.textContent = `${String(active).padStart(2, '0')} / ${String(galleryCards.length).padStart(2, '0')}`;
         }
       });
