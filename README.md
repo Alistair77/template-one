@@ -31,7 +31,7 @@ Everything event-specific in `index.html` is marked with an `EVENT:` comment.
 1. **Name, city and date:** the `<title>` and description, the hero, the menu panel, the agenda date card, the register section and the footer.
 2. **Countdown:** the `data-target` on `.hero-countdown`, as an ISO time with timezone (for example `2026-11-13T08:45:00+05:30`). After that time it shows the "took place" message instead.
 3. **Registration link:** the header, hero and register buttons. They currently open an email to events@bizoramedia.com; replace them with the real registration URL.
-4. **Partner logos:** the "Presented by" block at the top of the hero (delete it to hide the logos), the strip under the hero, and the "Brought to you by" section. Logos live in `assets/logos/`; use a `-on-dark` version on dark backgrounds.
+4. **Partner logos:** the "Presented by" block at the top of the hero (delete it to hide the logos), the strip inside the hero under the buttons, and the "Brought to you by" section. Logos live in `assets/logos/`; use a `-on-dark` version on dark backgrounds.
 5. **Speakers:** copy the example card in the speakers section for each speaker. Portraits are 4:5, about 600 × 750 px, and show in greyscale.
 6. **Agenda:** one `<li class="session">` per session in the timeline.
 7. **Brochure:** replace `assets/design-india-forward-pune-brochure.pdf` and update the two links to it.
