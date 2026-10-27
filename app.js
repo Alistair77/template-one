@@ -23,6 +23,21 @@
     });
   }
 
+  // The hero lead brightens word by word once the page settles. Words are built with
+  // DOM methods rather than innerHTML so page text never cross the markup boundary.
+  const lead = $('.hero-lead');
+  if (lead && !motionOff.matches) {
+    const words = (lead.textContent || '').trim().split(/\s+/);
+    lead.textContent = '';
+    words.forEach((word, index) => {
+      const wordSpan = document.createElement('span');
+      wordSpan.textContent = word;
+      wordSpan.style.setProperty('--w', String(index));
+      lead.append(wordSpan, ' ');
+    });
+    lead.classList.add('words-ready');
+  }
+
   // Reveal elements as they enter the reading flow; reduced-motion users see content immediately.
   const reveals = $$('.reveal');
   if ('IntersectionObserver' in window && !motionOff.matches) {
@@ -221,54 +236,99 @@
   window.addEventListener('resize', updateTopics);
   updateTopics();
 
-  // Scroll-linked motion: gentle parallax on marked elements, and the "It's about" photo that grows
-  // from a framed card to the full screen. Reduced-motion users get the finished state.
-  const parallaxItems = $$('[data-parallax]');
-  const zoom = $('.about-zoom');
-  const zoomWords = zoom ? $$('h2 span', zoom) : [];
-  if (!motionOff.matches) {
-    let motionFrame = 0;
-    const updateMotion = () => {
-      if (motionFrame) return;
-      motionFrame = requestAnimationFrame(() => {
-        motionFrame = 0;
-        const vh = window.innerHeight;
-        parallaxItems.forEach((item) => {
-          const rect = item.getBoundingClientRect();
-          if (rect.bottom < -200 || rect.top > vh + 200) return;
-          const offset = (rect.top + rect.height / 2 - vh / 2) * Number(item.dataset.parallax);
-          item.style.setProperty('--py', `${offset.toFixed(1)}px`);
+  // The two overview photos counter-drift on scroll, echoing the previous design's photo story.
+  const driftGroup = $('[data-drift-group]');
+  if (driftGroup && !motionOff.matches) {
+    const driftPhotos = $$('.overview-image img', driftGroup);
+    const driftRates = [-34, 46];
+    let driftFrame = 0;
+    const updateDrift = () => {
+      if (driftFrame) return;
+      driftFrame = requestAnimationFrame(() => {
+        driftFrame = 0;
+        const viewMidline = window.innerHeight / 2;
+        driftPhotos.forEach((photo, index) => {
+          const figure = photo.parentElement;
+          const bounds = figure.getBoundingClientRect();
+          if (bounds.bottom < -80 || bounds.top > window.innerHeight + 80) return;
+          const relative = (bounds.top + bounds.height / 2 - viewMidline) / window.innerHeight;
+          photo.style.setProperty('--drift-y', `${(relative * driftRates[index % driftRates.length]).toFixed(1)}px`);
         });
-        if (zoom) {
-          const range = Math.max(1, zoom.offsetHeight - (vh - headerHeight()));
-          const p = Math.max(0, Math.min(1, (headerHeight() - zoom.getBoundingClientRect().top) / range));
-          zoom.style.setProperty('--p', p.toFixed(3));
-          zoomWords.forEach((word, index) => word.classList.toggle('is-on', p > .16 + index * .24));
+      });
+    };
+    window.addEventListener('scroll', updateDrift, { passive: true });
+    window.addEventListener('resize', updateDrift);
+    updateDrift();
+  }
+
+  // The speaker gallery pins to the viewport and scrubs sideways from the page scroll; it arms
+  // only on wide motion-capable screens and falls back to the responsive grid everywhere else.
+  const gallerySection = $('.speakers');
+  const galleryViewport = $('.speaker-viewport');
+  const galleryTrack = $('[data-gallery-track]');
+  const galleryProgress = $('.gallery-progress i');
+  const galleryCount = $('.gallery-count');
+  if (gallerySection && galleryViewport && galleryTrack) {
+    const galleryArmed = () => !motionOff.matches && window.matchMedia('(min-width: 1101px)').matches;
+    const galleryCards = $$('.speaker-card', galleryTrack);
+    let galleryOn = false;
+    let galleryTravel = 0;
+    let galleryFrame = 0;
+    const measureGallery = () => {
+      galleryTravel = Math.max(0, galleryTrack.scrollWidth - galleryViewport.clientWidth);
+      const range = Math.max(window.innerHeight * .75, galleryTravel);
+      gallerySection.style.height = `${Math.ceil((window.innerHeight - headerHeight()) + range)}px`;
+      updateGallery();
+    };
+    const updateGallery = () => {
+      if (!galleryOn || galleryFrame) return;
+      galleryFrame = requestAnimationFrame(() => {
+        galleryFrame = 0;
+        const rect = gallerySection.getBoundingClientRect();
+        const travel = Math.max(1, gallerySection.offsetHeight - (window.innerHeight - headerHeight()));
+        const scrub = Math.max(0, Math.min(1, (headerHeight() - rect.top) / travel));
+        galleryTrack.style.transform = `translate3d(${(-galleryTravel * scrub).toFixed(1)}px, 0, 0)`;
+        const viewportBounds = galleryViewport.getBoundingClientRect();
+        const viewportCenter = viewportBounds.left + viewportBounds.width / 2;
+        galleryCards.forEach((card, index) => {
+          const bounds = card.getBoundingClientRect();
+          const center = bounds.left + bounds.width / 2;
+          const diagonal = Math.max(-1, Math.min(1, (center - viewportCenter) / (viewportBounds.width / 2 + bounds.width / 2)));
+          const visibility = Math.max(0, Math.min(1, (1.15 - Math.abs(diagonal)) / .45));
+          const stagger = [0, 8, -7, 6][index % 4];
+          const diagonalTravel = Math.min(125, window.innerHeight * .13);
+          card.style.setProperty('--gallery-y', `${(diagonal * diagonalTravel + stagger).toFixed(1)}px`);
+          card.style.setProperty('--gallery-scale', (0.91 + visibility * .09).toFixed(3));
+          card.style.setProperty('--gallery-opacity', (0.3 + visibility * .7).toFixed(3));
+        });
+        if (galleryProgress) galleryProgress.style.transform = `scaleX(${scrub.toFixed(3)})`;
+        if (galleryCount) {
+          const active = Math.min(galleryCards.length, Math.floor(scrub * Math.max(1, galleryCards.length - 1)) + 1);
+          galleryCount.textContent = `${String(active).padStart(2, '0')} / ${String(galleryCards.length).padStart(2, '0')}`;
         }
       });
     };
-    window.addEventListener('scroll', updateMotion, { passive: true });
-    window.addEventListener('resize', updateMotion);
-    updateMotion();
-  } else zoomWords.forEach((word) => word.classList.add('is-on'));
-
-  // Speaker cards and the event pass tilt toward the pointer, with a soft light following it.
-  if (!motionOff.matches && matchMedia('(hover: hover) and (pointer: fine)').matches) {
-    $$('[data-tilt]').forEach((card) => {
-      card.addEventListener('pointermove', (event) => {
-        const bounds = card.getBoundingClientRect();
-        const x = (event.clientX - bounds.left) / bounds.width;
-        const y = (event.clientY - bounds.top) / bounds.height;
-        card.style.setProperty('--mx', `${(x * 100).toFixed(1)}%`);
-        card.style.setProperty('--my', `${(y * 100).toFixed(1)}%`);
-        card.style.setProperty('--ry', `${((x - .5) * 8).toFixed(2)}deg`);
-        card.style.setProperty('--rx', `${((.5 - y) * 8).toFixed(2)}deg`);
+    const disarmGallery = () => {
+      gallerySection.style.height = '';
+      galleryTrack.style.transform = '';
+      galleryCards.forEach((card) => {
+        card.style.removeProperty('--gallery-y');
+        card.style.removeProperty('--gallery-scale');
+        card.style.removeProperty('--gallery-opacity');
       });
-      card.addEventListener('pointerleave', () => {
-        card.style.setProperty('--rx', '0deg');
-        card.style.setProperty('--ry', '0deg');
-      });
-    });
+      if (galleryProgress) galleryProgress.style.transform = 'scaleX(0)';
+    };
+    const armGallery = () => {
+      const should = galleryArmed();
+      if (should === galleryOn) { if (should) measureGallery(); return; }
+      galleryOn = should;
+      document.body.classList.toggle('gallery-armed', galleryOn);
+      if (galleryOn) measureGallery();
+      else disarmGallery();
+    };
+    window.addEventListener('scroll', updateGallery, { passive: true });
+    window.addEventListener('resize', armGallery);
+    armGallery();
   }
 
   // Press feedback stays on the event's primary calls to action.
