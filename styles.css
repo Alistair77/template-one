@@ -438,8 +438,25 @@ h1, h2, h3, p { margin: 0; }
 .who-grid .reveal:nth-child(4n+2), .speaker-grid .reveal:nth-child(4n+2) { transition-delay: .06s; }
 .who-grid .reveal:nth-child(4n+3), .speaker-grid .reveal:nth-child(4n+3) { transition-delay: .12s; }
 .who-grid .reveal:nth-child(4n+4), .speaker-grid .reveal:nth-child(4n+4) { transition-delay: .18s; }
-.flow > .reveal:nth-child(2) { transition-delay: .08s; }
-.flow > .reveal:nth-child(3) { transition-delay: .16s; }
+/* It's-about cards unveil: each panel wipes upward while its contents cascade in.
+   The resting state hides with opacity only — a clip-path here would zero the
+   card's visible area and the reveal observer would never fire for it. */
+.flow > .flow-card { opacity: 0; }
+.flow > .flow-card.is-visible { opacity: 1; clip-path: inset(0 0 0 0); animation: flowUnveil .8s var(--ease) both; }
+.flow > .flow-card:nth-child(2).is-visible { animation-delay: .12s; }
+.flow > .flow-card:nth-child(3).is-visible { animation-delay: .24s; }
+.flow-card.is-visible .flow-num { animation: flowDrop .5s var(--ease) .3s both; }
+.flow-card.is-visible .flow-icon { animation: flowPop .55s cubic-bezier(.3, 1.4, .5, 1) .38s both; }
+.flow-card.is-visible b { animation: flowRise .55s var(--ease) .46s both; }
+.flow-card.is-visible p { animation: flowRise .55s var(--ease) .56s both; }
+/* One-time sheen that sweeps across each card as it unveils. */
+.flow-card::before { content: ""; position: absolute; inset: 0; background: linear-gradient(105deg, transparent 42%, rgba(255, 255, 255, .08) 50%, transparent 58%); transform: translateX(-130%); pointer-events: none; }
+.flow-card.is-visible::before { animation: flowSheen 1.1s var(--ease) .3s both; }
+@keyframes flowUnveil { from { clip-path: inset(100% 0 0 0); opacity: 0; transform: translateY(18px); } }
+@keyframes flowDrop { from { opacity: 0; transform: translateY(-12px); } }
+@keyframes flowPop { from { opacity: 0; transform: scale(.55) rotate(-8deg); } }
+@keyframes flowRise { from { opacity: 0; transform: translateY(14px); } }
+@keyframes flowSheen { to { transform: translateX(130%); } }
 /* Role rows cascade inside each panel as it reveals. */
 .who-card.is-visible .role-in { animation: roleIn .55s var(--ease) both; }
 .who-card.is-visible .role-in:nth-child(2) { animation-delay: .07s; }
@@ -474,6 +491,9 @@ h1, h2, h3, p { margin: 0; }
   .reveal { opacity: 1; transform: none; transition: none; }
   .what-grid.is-visible .what-tile { animation: none; }
   .who-card.is-visible .role-in { animation: none; }
+  .flow > .flow-card { opacity: 1; clip-path: none; }
+  .flow > .flow-card.is-visible, .flow-card.is-visible .flow-num, .flow-card.is-visible .flow-icon, .flow-card.is-visible b, .flow-card.is-visible p { animation: none; }
+  .flow-card::before { content: none; }
   .flow-card::after { animation: none; }
   .is-tba .speaker-photo::after { content: none; }
   .topic-panel.is-changing .topic-content { opacity: 1; transform: none; }
