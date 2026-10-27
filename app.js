@@ -221,6 +221,56 @@
   window.addEventListener('resize', updateTopics);
   updateTopics();
 
+  // Scroll-linked motion: gentle parallax on marked elements, and the "It's about" photo that grows
+  // from a framed card to the full screen. Reduced-motion users get the finished state.
+  const parallaxItems = $$('[data-parallax]');
+  const zoom = $('.about-zoom');
+  const zoomWords = zoom ? $$('h2 span', zoom) : [];
+  if (!motionOff.matches) {
+    let motionFrame = 0;
+    const updateMotion = () => {
+      if (motionFrame) return;
+      motionFrame = requestAnimationFrame(() => {
+        motionFrame = 0;
+        const vh = window.innerHeight;
+        parallaxItems.forEach((item) => {
+          const rect = item.getBoundingClientRect();
+          if (rect.bottom < -200 || rect.top > vh + 200) return;
+          const offset = (rect.top + rect.height / 2 - vh / 2) * Number(item.dataset.parallax);
+          item.style.setProperty('--py', `${offset.toFixed(1)}px`);
+        });
+        if (zoom) {
+          const range = Math.max(1, zoom.offsetHeight - (vh - headerHeight()));
+          const p = Math.max(0, Math.min(1, (headerHeight() - zoom.getBoundingClientRect().top) / range));
+          zoom.style.setProperty('--p', p.toFixed(3));
+          zoomWords.forEach((word, index) => word.classList.toggle('is-on', p > .16 + index * .24));
+        }
+      });
+    };
+    window.addEventListener('scroll', updateMotion, { passive: true });
+    window.addEventListener('resize', updateMotion);
+    updateMotion();
+  } else zoomWords.forEach((word) => word.classList.add('is-on'));
+
+  // Speaker cards and the event pass tilt toward the pointer, with a soft light following it.
+  if (!motionOff.matches && matchMedia('(hover: hover) and (pointer: fine)').matches) {
+    $$('[data-tilt]').forEach((card) => {
+      card.addEventListener('pointermove', (event) => {
+        const bounds = card.getBoundingClientRect();
+        const x = (event.clientX - bounds.left) / bounds.width;
+        const y = (event.clientY - bounds.top) / bounds.height;
+        card.style.setProperty('--mx', `${(x * 100).toFixed(1)}%`);
+        card.style.setProperty('--my', `${(y * 100).toFixed(1)}%`);
+        card.style.setProperty('--ry', `${((x - .5) * 8).toFixed(2)}deg`);
+        card.style.setProperty('--rx', `${((.5 - y) * 8).toFixed(2)}deg`);
+      });
+      card.addEventListener('pointerleave', () => {
+        card.style.setProperty('--rx', '0deg');
+        card.style.setProperty('--ry', '0deg');
+      });
+    });
+  }
+
   // Press feedback stays on the event's primary calls to action.
   if (!motionOff.matches) {
     $$('.btn').forEach((control) => {
