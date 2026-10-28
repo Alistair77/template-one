@@ -296,7 +296,7 @@
           const diagonal = Math.max(-1, Math.min(1, (center - viewportCenter) / (viewportBounds.width / 2 + bounds.width / 2)));
           const visibility = Math.max(0, Math.min(1, (1.15 - Math.abs(diagonal)) / .45));
           const stagger = [0, 8, -7, 6][index % 4];
-          const diagonalTravel = Math.min(92, window.innerHeight * .1);
+          const diagonalTravel = Math.min(40, window.innerHeight * .045);
           // Over the final stretch of the scrub the row settles level, so the last
           // panel's name always lands fully inside the viewport.
           const settle = Math.max(0, Math.min(1, (scrub - .8) / .2));
@@ -335,6 +335,64 @@
     window.addEventListener('scroll', updateGallery, { passive: true });
     window.addEventListener('resize', armGallery);
     armGallery();
+  }
+
+  // Ambient scroll motion: [data-parallax] elements drift at their own speed, and the
+  // "What is" description lights up word by word as it rises through the screen.
+  const parallaxItems = $$('[data-parallax]');
+  const highlight = $('[data-highlight]');
+  const highlightWords = [];
+  if (highlight) {
+    const words = highlight.textContent.trim().split(/\s+/);
+    highlight.textContent = '';
+    words.forEach((word, index) => {
+      const span = document.createElement('span');
+      span.className = 'w';
+      span.textContent = word;
+      highlight.append(span, index < words.length - 1 ? ' ' : '');
+      highlightWords.push(span);
+    });
+  }
+  if (!motionOff.matches) {
+    let ambientFrame = 0;
+    const updateAmbient = () => {
+      if (ambientFrame) return;
+      ambientFrame = requestAnimationFrame(() => {
+        ambientFrame = 0;
+        const vh = window.innerHeight;
+        parallaxItems.forEach((item) => {
+          const rect = item.getBoundingClientRect();
+          if (rect.bottom < -200 || rect.top > vh + 200) return;
+          item.style.setProperty('--py', `${((rect.top + rect.height / 2 - vh / 2) * Number(item.dataset.parallax)).toFixed(1)}px`);
+        });
+        if (highlight) {
+          const lit = Math.max(0, Math.min(1, (vh * .85 - highlight.getBoundingClientRect().top) / (vh * .45)));
+          highlightWords.forEach((word, index) => word.classList.toggle('is-lit', index / highlightWords.length < lit));
+        }
+      });
+    };
+    window.addEventListener('scroll', updateAmbient, { passive: true });
+    window.addEventListener('resize', updateAmbient);
+    updateAmbient();
+  } else highlightWords.forEach((word) => word.classList.add('is-lit'));
+
+  // "What is" tiles tilt toward the pointer, with a soft light following it.
+  if (!motionOff.matches && matchMedia('(hover: hover) and (pointer: fine)').matches) {
+    $$('[data-tilt]').forEach((card) => {
+      card.addEventListener('pointermove', (event) => {
+        const bounds = card.getBoundingClientRect();
+        const x = (event.clientX - bounds.left) / bounds.width;
+        const y = (event.clientY - bounds.top) / bounds.height;
+        card.style.setProperty('--mx', `${(x * 100).toFixed(1)}%`);
+        card.style.setProperty('--my', `${(y * 100).toFixed(1)}%`);
+        card.style.setProperty('--ry', `${((x - .5) * 7).toFixed(2)}deg`);
+        card.style.setProperty('--rx', `${((.5 - y) * 7).toFixed(2)}deg`);
+      });
+      card.addEventListener('pointerleave', () => {
+        card.style.setProperty('--rx', '0deg');
+        card.style.setProperty('--ry', '0deg');
+      });
+    });
   }
 
   // Press feedback stays on the event's primary calls to action.
