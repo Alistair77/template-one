@@ -395,6 +395,37 @@
     });
   }
 
+  // Scroll-assembled cards: inside each [data-assemble] group, every [data-enter] card flies in from
+  // its own offset as the group scrolls up the screen, one after another. Cards are marked "is-in"
+  // once they land, which starts their inner animations. Reduced motion shows them in place.
+  const assembleGroups = $$('[data-assemble]');
+  if (!motionOff.matches) {
+    let assembleFrame = 0;
+    const updateAssemble = () => {
+      if (assembleFrame) return;
+      assembleFrame = requestAnimationFrame(() => {
+        assembleFrame = 0;
+        const vh = window.innerHeight;
+        assembleGroups.forEach((group) => {
+          const rect = group.getBoundingClientRect();
+          const p = Math.max(0, Math.min(1, (vh * .98 - rect.top) / (vh * .62)));
+          group.style.setProperty('--p', p.toFixed(3));
+          const cards = $$('[data-enter]', group);
+          const step = .14;
+          cards.forEach((card, index) => {
+            const raw = Math.max(0, Math.min(1, p * (1 + (cards.length - 1) * step) - index * step));
+            const eased = 1 - Math.pow(1 - raw, 3);
+            card.style.setProperty('--pi', eased.toFixed(3));
+            if (eased > .92) card.classList.add('is-in');
+          });
+        });
+      });
+    };
+    window.addEventListener('scroll', updateAssemble, { passive: true });
+    window.addEventListener('resize', updateAssemble);
+    updateAssemble();
+  } else $$('[data-enter]').forEach((card) => card.classList.add('is-in'));
+
   // Press feedback stays on the event's primary calls to action.
   if (!motionOff.matches) {
     $$('.btn').forEach((control) => {
