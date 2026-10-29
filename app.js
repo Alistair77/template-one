@@ -154,9 +154,9 @@
   // picks the question, so the view is always aligned and touch, keyboard and wheel all behave the same.
   const topicCopy = [
     { title: 'Better decisions, together.', text: 'How do hundreds of people working on the same project make better decisions together?' },
-    { title: 'Catch it before site.', text: 'How do you identify a problem before it reaches the construction site?' },
+    { title: 'Catch issues<br />early.', text: 'How do you identify a problem before it reaches the construction site?' },
     { title: 'One building, not three.', text: 'How do you make sure the building being designed, the building being constructed and the building eventually being operated are not three different versions of the same idea?' },
-    { title: 'When AI enters.', text: 'And what changes when AI begins entering that process?' },
+    { title: 'AI enters<br />the room…', text: 'And what changes when AI begins entering that process?' },
   ];
   const topicsSection = $('.topics');
   const topicTabs = $$('.topic-tab');
